@@ -50,12 +50,21 @@ def ack_payload(command: Optional[str], success: bool, message: Optional[str] = 
     return payload
 
 
+def get_cpu_temperature(path: str = '/sys/class/thermal/thermal_zone0/temp') -> Optional[float]:
+    """Reads CPU temperature from a sysfs file."""
+    try:
+        temp_str = Path(path).read_text().strip()
+        return float(temp_str) / 1000.0
+    except (FileNotFoundError, ValueError):
+        return None
+
+
 def gather_status() -> Dict[str, Any]:
     # Replace with actual telemetry collection as needed.
     return {
         "status": "running",
         "timestamp": datetime.utcnow().isoformat(),
-        "cpu_temp": None,  # e.g., Path('/sys/class/thermal/thermal_zone0/temp')
+        "cpu_temp": get_cpu_temperature(),
         "hostname": os.uname().nodename,
     }
 
@@ -66,7 +75,6 @@ def handle_control_command(client: mqtt.Client, payload: Dict[str, Any]) -> None
 
     if command == "status":
         publish(client, TOPIC_STATUS, {**gather_status(), "source": "pi"})
-        publish(client, TOPIC_STATUS, ack_payload(command, True))
         return
 
     if command == "hifi_power":
@@ -177,8 +185,12 @@ def on_message(client, userdata, msg):
 
 
 client = mqtt.Client()
-if USERNAME:
-    client.username_pw_set(USERNAME, PASSWORD or "")
+if USERNAME and PASSWORD:
+    client.username_pw_set(USERNAME, PASSWORD)
+else:
+    print("Warning: No MQTT credentials set.")
+    raise SystemExit(1)
+
 client.on_message = on_message
 
 client.connect(BROKER, PORT)
