@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional
 
 import paho.mqtt.client as mqtt
 
+import hifi_service
+
 
 def load_env(path: str = ".env") -> None:
     env_path = Path(path)
@@ -77,15 +79,19 @@ def handle_control_command(client: mqtt.Client, payload: Dict[str, Any]) -> None
         publish(client, TOPIC_STATUS, {**gather_status(), "source": "pi"})
         return
 
-    if command == "hifi_power":
-        desired_state = str(args.get("state", "")).lower() or "unknown"
-        # Example placeholder for real relay control:
-        # subprocess.run(["/usr/local/bin/hifi_power.sh", desired_state], check=False)
-        publish(
-            client,
-            TOPIC_STATUS,
-            ack_payload(command, True, hifi_state=desired_state),
-        )
+    if command == "hifi_on":
+        hifi_service.turn_on()
+        publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned on"))
+        return
+
+    if command == "hifi_off":
+        hifi_service.turn_off()
+        publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned off"))
+        return
+
+    if command == "hifi_status":
+        status = hifi_service.check_state()
+        publish(client, TOPIC_STATUS, ack_payload(command, True, status=status))
         return
 
     publish(
