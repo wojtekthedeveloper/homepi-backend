@@ -79,19 +79,19 @@ def handle_control_command(client: mqtt.Client, payload: Dict[str, Any]) -> None
         publish(client, TOPIC_STATUS, {**gather_status(), "source": "pi"})
         return
 
-    if command == "hifi_on":
-        hifi_service.turn_on()
-        publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned on"))
-        return
-
-    if command == "hifi_off":
-        hifi_service.turn_off()
-        publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned off"))
-        return
-
-    if command == "hifi_status":
-        status = hifi_service.check_state()
-        publish(client, TOPIC_STATUS, ack_payload(command, True, status=status))
+    if command == "hifi_power":
+        action = args.get("state")
+        if action == "on":
+            hifi_service.turn_on()
+            publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned on"))
+        elif action == "off":
+            hifi_service.turn_off()
+            publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned off"))
+        elif action == "status":
+            status = hifi_service.check_state()
+            publish(client, TOPIC_STATUS, ack_payload(command, True, status=status))
+        else:
+            publish(client, TOPIC_STATUS, ack_payload(command, False, message="Invalid action for hifi_power command"))
         return
 
     publish(
