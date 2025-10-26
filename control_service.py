@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 import paho.mqtt.client as mqtt
 
 import hifi_service
+import mpd_service
 
 
 def load_env(path: str = ".env") -> None:
@@ -72,6 +73,7 @@ def gather_status() -> Dict[str, Any]:
 
 
 def handle_control_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
+
     command = payload.get("command")
     args = payload.get("args") or {}
 
@@ -125,53 +127,37 @@ def handle_bluetooth_command(client: mqtt.Client, payload: Dict[str, Any]) -> No
 def handle_mpd_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
     command = payload.get("command")
 
-    if command in {"play", "pause", "stop"}:
-        # subprocess.run(["/usr/local/bin/mpd_control.sh", command], check=False)
-        publish(
-            client,
-            TOPIC_MPD_STATUS,
-            ack_payload(command, True, state=command),
-        )
-        return
-
-    if command == "status":
-        publish(
-            client,
-            TOPIC_MPD_STATUS,
-            {
-                "source": "pi",
-                "state": "stopped",
-                "song": None,
-                "timestamp": datetime.utcnow().isoformat(),
-            },
-        )
-        publish(
-            client,
-            TOPIC_MPD_STATUS,
-            ack_payload(command, True),
-        )
-        return
-
-    if command == "list_playlists":
-        playlists = ["Morning Mix", "Evening Chill"]  # Replace with `mpc lsplaylists`
-        publish(
-            client,
-            TOPIC_MPD_STATUS,
-            ack_payload(command, True, playlists=playlists),
-        )
-        return
-
-    publish(
-        client,
-        TOPIC_MPD_STATUS,
-        ack_payload(command, False, message="Unknown MPD command"),
-    )
+    if command == "play":
+        mpd_service.play()
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="play"))
+    elif command == "pause":
+        mpd_service.pause()
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="pause"))
+    elif command == "stop":
+        mpd_service.stop()
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="stop"))
+    elif command == "status":
+        status = mpd_service.status()
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, status=status))
+    elif command == "list_playlists":
+        playlists = mpd_service.list_playlists()
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, playlists=playlists))
+    elif command == "load_playlist":
+        args = payload.get("args") or {}
+        playlist_name = args.get("name")
+        if not playlist_name:
+            publish(client, TOPIC_MPD_STATUS, ack_payload(command, False, message="Playlist name not provided"))
+            return
+        status = mpd_service.load_playlist(playlist_name)
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, message=f"Loaded playlist {playlist_name}", status=status))
+    else:
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, False, message="Unknown MPD command"))
 
 
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
-        print(f"Received on {msg.topic}: {payload}")
+        print("Received on {msg.topic}: {payload}")
     except json.JSONDecodeError:
         print("Invalid JSON payload; ignoring.")
         return
