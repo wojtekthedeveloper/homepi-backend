@@ -142,6 +142,14 @@ def handle_mpd_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
     elif command == "list_playlists":
         playlists = mpd_service.list_playlists()
         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, playlists=playlists))
+    elif command == "set_volume":
+        args = payload.get("args") or {}
+        volume = args.get("level")
+        if volume is None or not isinstance(volume, int) or not (0 <= volume <= 100):
+            publish(client, TOPIC_MPD_STATUS, ack_payload(command, False, message="Invalid volume level"))
+            return
+        mpd_service.set_volume(volume)
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, volume=volume))
     elif command == "load_playlist":
         args = payload.get("args") or {}
         playlist_name = args.get("name")

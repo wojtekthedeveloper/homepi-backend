@@ -9,6 +9,9 @@ def load_playlist(playlist_name):
     process = subprocess.run(["mpc", "load", playlist_name], capture_output=True, text=True)
     return process.stdout.strip()
 
+def set_volume(level):
+    subprocess.run(["mpc", "volume", str(level)])
+
 def play():
     subprocess.run(["mpc", "play"])
 
