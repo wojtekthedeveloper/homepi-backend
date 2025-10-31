@@ -136,6 +136,12 @@ def handle_mpd_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
     elif command == "stop":
         mpd_service.stop()
         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="stop"))
+    elif command == "previous":
+        mpd_service.previous()
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="previous"))
+    elif command == "next":
+        mpd_service.next()
+        publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="next"))
     elif command == "status":
         status = mpd_service.status()
         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, status=status))
