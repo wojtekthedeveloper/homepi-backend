@@ -1,23 +1,18 @@
 #!/bin/bash
 
-DIRECTION=/sys/class/gpio/gpio23/direction
-VALUE=/sys/class/gpio/gpio23/value
-EXPORT=/sys/class/gpio/export
-if [ ! -f "$DIRECTION" ]; then
-  echo 23 > "$EXPORT"
-  sleep 0.1
-  echo out > "$DIRECTION"
-  echo 1 > "$VALUE" # 1 means turned off
-fi
-
 if [ "$1" == "on" ]; then
    CURRENT=1
 elif [ "$1" == "off" ]; then
    CURRENT=0
 elif [ "$1" == "toggle" ]; then
-   CURRENT=$(cat ${VALUE})
+   CURRENT=$(gpioget --as-is --numeric GPIO23)
 elif [ "$1" == "status" ]; then
-   cat ${VALUE}
+   CURRENT=$(gpioget --as-is --numeric GPIO23)
+   if [ "$CURRENT" == "0" ]; then
+	   echo on
+   else 
+	   echo off
+   fi
    exit 0
 else 
    echo "Usage: $0 [on|off|toggle|status]"
@@ -25,14 +20,11 @@ else
 fi
 echo $CURRENT
 if [ $CURRENT == "0" ]; then
-  echo "SETTING ZERO"
-  echo 1 > "$VALUE"
+  echo "Turn off"
+  gpioset -t0 GPIO23=1
   $(dirname $0)/led.sh off
-
 else
-  echo "SETTING ONE"
-  echo 0 > "$VALUE"
+  echo "Turn on"
+  gpioset -t0 GPIO23=0
   $(dirname $0)/led.sh on
 fi
-
-
