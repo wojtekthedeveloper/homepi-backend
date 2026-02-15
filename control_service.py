@@ -9,6 +9,7 @@ import paho.mqtt.client as mqtt
 
 import hifi_service
 import mpd_service
+import misc_service
 
 
 def load_env(path: str = ".env") -> None:
@@ -35,6 +36,8 @@ TOPIC_MPD_CONTROL = "pi/mpd/control"
 TOPIC_MPD_STATUS = "pi/mpd/status"
 TOPIC_BT_CONTROL = "pi/bluetooth/control"
 TOPIC_BT_STATUS = "pi/bluetooth/status"
+TOPIC_MISC_CONTROL = "pi/misc/control"
+TOPIC_MISC_STATUS = "pi/misc/status"
 
 
 def publish(client: mqtt.Client, topic: str, payload: Dict[str, Any]) -> None:
@@ -168,6 +171,18 @@ def handle_mpd_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
         publish(client, TOPIC_MPD_STATUS, ack_payload(command, False, message="Unknown MPD command"))
 
 
+def handle_misc_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
+    command = payload.get("command")
+    if command == "add_playlist":
+        args = payload.get("args") or {}
+        name = args.get("playlist_name")
+        url = args.get("playlist_url")
+        status = misc_service.add_playlist(name, url)
+        publish(client, TOPIC_MISC_STATUS, ack_payload(command, True, status=status))
+    else:
+        publish(client, TOPIC_MISC_STATUS, ack_payload(command, False, message="Unknown MISC command"))
+
+
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
@@ -182,6 +197,8 @@ def on_message(client, userdata, msg):
         handle_mpd_command(client, payload)
     elif msg.topic == TOPIC_BT_CONTROL:
         handle_bluetooth_command(client, payload)
+    elif msg.topic == TOPIC_MISC_CONTROL:
+        handle_misc_command(client, payload)
     else:
         publish(
             client,
@@ -203,6 +220,7 @@ client.connect(BROKER, PORT)
 client.subscribe(TOPIC_CONTROL)
 client.subscribe(TOPIC_MPD_CONTROL)
 client.subscribe(TOPIC_BT_CONTROL)
+client.subscribe(TOPIC_MISC_CONTROL)
 
 print("MQTT control service running...")
 client.loop_forever()
