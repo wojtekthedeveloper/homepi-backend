@@ -3,7 +3,7 @@
 # set -e
 # set -x
 
-source ../.env
+source $(dirname $0)/../.env
 
 NAME="$1"
 URL="$2"
@@ -27,6 +27,12 @@ $YTDLP_EXE \
   --extract-audio --audio-format mp3 \
   -o "$TMP_DIR/%(title)s.%(ext)s" \
   "$URL"
+
+if ! compgen -G "$TMP_DIR/*.mp3" > /dev/null; then
+    echo "no mp3 found in $TMP_DIR"
+    rmdir "$TMP_DIR" 2>/dev/null || true
+    exit 1
+fi
 
 # Normalize filenames to simple ASCII and move to music dir
 for f in "$TMP_DIR"/*.mp3; do
