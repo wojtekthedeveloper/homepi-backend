@@ -23,6 +23,7 @@ rm -f "$PLAYLIST_FILE"
 
 # Download playlist as mp3 into temp dir
 $YTDLP_EXE \
+  --js-runtimes deno:$DENO_EXE \
   --restrict-filenames \
   --extract-audio --audio-format mp3 \
   -o "$TMP_DIR/%(title)s.%(ext)s" \
