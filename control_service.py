@@ -70,14 +70,26 @@ def publish_mpd_status(client: mqtt.Client) -> None:
     # Provide structured status for the new client
     lines = status.splitlines()
     state = "stopped"
+    volume = 0
+    
     if len(lines) > 1:
         if "[playing]" in lines[1]:
             state = "playing"
         elif "[paused]" in lines[1]:
             state = "paused"
+            
+    # Parse volume from status string (e.g., "volume: 50%   repeat: off ...")
+    for line in lines:
+        if line.startswith("volume:"):
+            try:
+                # Extract digits from the volume part
+                vol_part = line.split()[1]
+                volume = int("".join(filter(str.isdigit, vol_part)))
+            except (IndexError, ValueError):
+                pass
+            break
     
-    # We can also parse repeat, random, etc if needed, but for now we'll send the raw status too
-    publish(client, TOPIC_HOMEPI_MPD_STATUS, {"status": status, "state": state})
+    publish(client, TOPIC_HOMEPI_MPD_STATUS, {"status": status, "state": state, "volume": volume})
 
 
 def ack_payload(command: Optional[str], success: bool, message: Optional[str] = None, **extra: Any) -> Dict[str, Any]:
@@ -300,6 +312,10 @@ def handle_homepi_mpd_command(client: mqtt.Client, payload: Any) -> None:
         state = args.get("state")
         if state in ["on", "off"]:
             mpd_service.repeat(state)
+    elif command == "set_volume":
+        level = args.get("level")
+        if level is not None and isinstance(level, int):
+            mpd_service.set_volume(level)
     elif command == "status":
         pass
     else:
