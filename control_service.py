@@ -44,6 +44,8 @@ TOPIC_HIFI_CONTROL = "homepi/hifi/control"
 TOPIC_HIFI_STATUS = "homepi/hifi/status"
 TOPIC_PLAYLIST_CONTROL = "homepi/playlists/control"
 TOPIC_PLAYLIST_STATUS = "homepi/playlists/status"
+TOPIC_HOMEPI_MPD_CONTROL = "homepi/mpd/control"
+TOPIC_HOMEPI_MPD_STATUS = "homepi/mpd/status"
 
 
 def publish(client: mqtt.Client, topic: str, payload: Dict[str, Any]) -> None:
@@ -60,6 +62,22 @@ def publish_playlist_status(client: mqtt.Client) -> None:
     """Publishes the list of playlists for the refactored client."""
     playlists = mpd_service.list_playlists()
     publish(client, TOPIC_PLAYLIST_STATUS, {"playlists": playlists})
+
+
+def publish_mpd_status(client: mqtt.Client) -> None:
+    """Publishes MPD status for the refactored client."""
+    status = mpd_service.status()
+    # Provide structured status for the new client
+    lines = status.splitlines()
+    state = "stopped"
+    if len(lines) > 1:
+        if "[playing]" in lines[1]:
+            state = "playing"
+        elif "[paused]" in lines[1]:
+            state = "paused"
+    
+    # We can also parse repeat, random, etc if needed, but for now we'll send the raw status too
+    publish(client, TOPIC_HOMEPI_MPD_STATUS, {"status": status, "state": state})
 
 
 def ack_payload(command: Optional[str], success: bool, message: Optional[str] = None, **extra: Any) -> Dict[str, Any]:
@@ -247,8 +265,47 @@ def handle_playlist_command(client: mqtt.Client, payload: Any) -> None:
         name = args.get("name")
         if name:
             mpd_service.load_playlist(name)
+            publish_mpd_status(client)
     else:
         return
+
+
+def handle_homepi_mpd_command(client: mqtt.Client, payload: Any) -> None:
+    """Handles commands for the new homepi/mpd control topic."""
+    if not isinstance(payload, dict):
+        if str(payload).lower() == "status":
+            publish_mpd_status(client)
+        return
+
+    command = payload.get("command")
+    args = payload.get("args") or {}
+
+    if command == "play":
+        mpd_service.play()
+    elif command == "pause":
+        mpd_service.pause()
+    elif command == "toggle_play_pause":
+        mpd_service.toggle()
+    elif command == "stop":
+        mpd_service.stop()
+    elif command == "next":
+        mpd_service.next()
+    elif command == "previous":
+        mpd_service.previous()
+    elif command == "shuffle":
+        state = args.get("state")
+        if state in ["on", "off"]:
+            mpd_service.shuffle(state)
+    elif command == "repeat":
+        state = args.get("state")
+        if state in ["on", "off"]:
+            mpd_service.repeat(state)
+    elif command == "status":
+        pass
+    else:
+        return
+
+    publish_mpd_status(client)
 
 
 def on_message(client, userdata, msg):
@@ -271,6 +328,8 @@ def on_message(client, userdata, msg):
         handle_hifi_mqtt_command(client, payload)
     elif msg.topic == TOPIC_PLAYLIST_CONTROL:
         handle_playlist_command(client, payload)
+    elif msg.topic == TOPIC_HOMEPI_MPD_CONTROL:
+        handle_homepi_mpd_command(client, payload)
     else:
         publish(
             client,
@@ -288,9 +347,11 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe(TOPIC_MISC_CONTROL)
         client.subscribe(TOPIC_HIFI_CONTROL)
         client.subscribe(TOPIC_PLAYLIST_CONTROL)
+        client.subscribe(TOPIC_HOMEPI_MPD_CONTROL)
         # Initial status updates
         publish_hifi_status(client)
         publish_playlist_status(client)
+        publish_mpd_status(client)
     else:
         print(f"Failed to connect, return code {rc}")
 

@@ -28,6 +28,15 @@ def next():
 def previous():
     subprocess.run(["mpc", "prev"])
 
+def toggle():
+    subprocess.run(["mpc", "toggle"])
+
+def shuffle(state: str):
+    subprocess.run(["mpc", "random", state])
+
+def repeat(state: str):
+    subprocess.run(["mpc", "repeat", state])
+
 def status():
     process = subprocess.run(["mpc", "status"], capture_output=True, text=True)
     return process.stdout.strip()
