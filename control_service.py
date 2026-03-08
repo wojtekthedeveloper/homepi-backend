@@ -39,9 +39,19 @@ TOPIC_BT_STATUS = "pi/bluetooth/status"
 TOPIC_MISC_CONTROL = "pi/misc/control"
 TOPIC_MISC_STATUS = "pi/misc/status"
 
+# New topics for refactored client
+TOPIC_HIFI_CONTROL = "homepi/hifi/control"
+TOPIC_HIFI_STATUS = "homepi/hifi/status"
+
 
 def publish(client: mqtt.Client, topic: str, payload: Dict[str, Any]) -> None:
     client.publish(topic, json.dumps(payload, default=str))
+
+
+def publish_hifi_status(client: mqtt.Client) -> None:
+    """Publishes HiFi status in the new format for the refactored client."""
+    state = hifi_service.check_state()
+    publish(client, TOPIC_HIFI_STATUS, {"hifi_status": state == "on"})
 
 
 def ack_payload(command: Optional[str], success: bool, message: Optional[str] = None, **extra: Any) -> Dict[str, Any]:
@@ -89,12 +99,15 @@ def handle_control_command(client: mqtt.Client, payload: Dict[str, Any]) -> None
         if action == "on":
             hifi_service.turn_on()
             publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned on"))
+            publish_hifi_status(client)
         elif action == "off":
             hifi_service.turn_off()
             publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned off"))
+            publish_hifi_status(client)
         elif action == "status":
             status = hifi_service.check_state()
             publish(client, TOPIC_STATUS, ack_payload(command, True, status=status))
+            publish_hifi_status(client)
         else:
             publish(client, TOPIC_STATUS, ack_payload(command, False, message="Invalid action for hifi_power command"))
         return
@@ -183,13 +196,41 @@ def handle_misc_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
         publish(client, TOPIC_MISC_STATUS, ack_payload(command, False, message="Unknown MISC command"))
 
 
+def handle_hifi_mqtt_command(client: mqtt.Client, payload: Any) -> None:
+    """Handles commands for the new HiFi control topic using the CommandMessage format."""
+    if not isinstance(payload, dict):
+        # Support raw string 'status' for convenience
+        if str(payload).lower() == "status":
+            publish_hifi_status(client)
+        return
+
+    command = payload.get("command")
+    args = payload.get("args") or {}
+
+    if command == "hifi_power":
+        state = args.get("state")
+        if state == "on":
+            hifi_service.turn_on()
+        elif state == "off":
+            hifi_service.turn_off()
+        else:
+            return
+    elif command == "status":
+        pass  # Just publish status below
+    else:
+        return
+
+    publish_hifi_status(client)
+
+
+
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
-        print("Received on {msg.topic}: {payload}")
+        print(f"Received on {msg.topic}: {payload}")
     except json.JSONDecodeError:
-        print("Invalid JSON payload; ignoring.")
-        return
+        payload = msg.payload.decode()
+        print(f"Received on {msg.topic} (raw): {payload}")
 
     if msg.topic == TOPIC_CONTROL:
         handle_control_command(client, payload)
@@ -199,12 +240,28 @@ def on_message(client, userdata, msg):
         handle_bluetooth_command(client, payload)
     elif msg.topic == TOPIC_MISC_CONTROL:
         handle_misc_command(client, payload)
+    elif msg.topic == TOPIC_HIFI_CONTROL:
+        handle_hifi_mqtt_command(client, payload)
     else:
         publish(
             client,
             TOPIC_STATUS,
-            ack_payload(payload.get("command"), False, message="Unhandled topic"),
+            ack_payload(payload.get("command") if isinstance(payload, dict) else None, False, message="Unhandled topic"),
         )
+
+
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print(f"Connected to MQTT broker at {BROKER}:{PORT}")
+        client.subscribe(TOPIC_CONTROL)
+        client.subscribe(TOPIC_MPD_CONTROL)
+        client.subscribe(TOPIC_BT_CONTROL)
+        client.subscribe(TOPIC_MISC_CONTROL)
+        client.subscribe(TOPIC_HIFI_CONTROL)
+        # Publish initial HiFi status
+        publish_hifi_status(client)
+    else:
+        print(f"Failed to connect, return code {rc}")
 
 
 client = mqtt.Client()
@@ -214,13 +271,10 @@ else:
     print("Warning: No MQTT credentials set.")
     raise SystemExit(1)
 
+client.on_connect = on_connect
 client.on_message = on_message
 
 client.connect(BROKER, PORT)
-client.subscribe(TOPIC_CONTROL)
-client.subscribe(TOPIC_MPD_CONTROL)
-client.subscribe(TOPIC_BT_CONTROL)
-client.subscribe(TOPIC_MISC_CONTROL)
 
 print("MQTT control service running...")
 client.loop_forever()
