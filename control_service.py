@@ -42,6 +42,8 @@ TOPIC_MISC_STATUS = "pi/misc/status"
 # New topics for refactored client
 TOPIC_HIFI_CONTROL = "homepi/hifi/control"
 TOPIC_HIFI_STATUS = "homepi/hifi/status"
+TOPIC_PLAYLIST_CONTROL = "homepi/playlists/control"
+TOPIC_PLAYLIST_STATUS = "homepi/playlists/status"
 
 
 def publish(client: mqtt.Client, topic: str, payload: Dict[str, Any]) -> None:
@@ -52,6 +54,12 @@ def publish_hifi_status(client: mqtt.Client) -> None:
     """Publishes HiFi status in the new format for the refactored client."""
     state = hifi_service.check_state()
     publish(client, TOPIC_HIFI_STATUS, {"hifi_status": state == "on"})
+
+
+def publish_playlist_status(client: mqtt.Client) -> None:
+    """Publishes the list of playlists for the refactored client."""
+    playlists = mpd_service.list_playlists()
+    publish(client, TOPIC_PLAYLIST_STATUS, {"playlists": playlists})
 
 
 def ack_payload(command: Optional[str], success: bool, message: Optional[str] = None, **extra: Any) -> Dict[str, Any]:
@@ -223,6 +231,20 @@ def handle_hifi_mqtt_command(client: mqtt.Client, payload: Any) -> None:
     publish_hifi_status(client)
 
 
+def handle_playlist_command(client: mqtt.Client, payload: Any) -> None:
+    """Handles commands for the new playlist control topic."""
+    if not isinstance(payload, dict):
+        if str(payload).lower() == "status":
+            publish_playlist_status(client)
+        return
+
+    command = payload.get("command")
+
+    if command == "get_playlists":
+        publish_playlist_status(client)
+    else:
+        return
+
 
 def on_message(client, userdata, msg):
     try:
@@ -242,6 +264,8 @@ def on_message(client, userdata, msg):
         handle_misc_command(client, payload)
     elif msg.topic == TOPIC_HIFI_CONTROL:
         handle_hifi_mqtt_command(client, payload)
+    elif msg.topic == TOPIC_PLAYLIST_CONTROL:
+        handle_playlist_command(client, payload)
     else:
         publish(
             client,
@@ -258,8 +282,10 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe(TOPIC_BT_CONTROL)
         client.subscribe(TOPIC_MISC_CONTROL)
         client.subscribe(TOPIC_HIFI_CONTROL)
-        # Publish initial HiFi status
+        client.subscribe(TOPIC_PLAYLIST_CONTROL)
+        # Initial status updates
         publish_hifi_status(client)
+        publish_playlist_status(client)
     else:
         print(f"Failed to connect, return code {rc}")
 
