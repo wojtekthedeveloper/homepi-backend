@@ -239,9 +239,14 @@ def handle_playlist_command(client: mqtt.Client, payload: Any) -> None:
         return
 
     command = payload.get("command")
+    args = payload.get("args") or {}
 
     if command == "get_playlists":
         publish_playlist_status(client)
+    elif command == "play_playlist":
+        name = args.get("name")
+        if name:
+            mpd_service.load_playlist(name)
     else:
         return
 
