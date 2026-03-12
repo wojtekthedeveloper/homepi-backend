@@ -31,7 +31,6 @@ PORT = int(os.getenv("MQTT_PORT", "1883"))
 USERNAME = os.getenv("MQTT_USERNAME")
 PASSWORD = os.getenv("MQTT_PASSWORD")
 
-# New topics for refactored client
 TOPIC_HOMEPI_HIFI_CONTROL = "homepi/hifi/control"
 TOPIC_HOMEPI_HIFI_STATUS = "homepi/hifi/status"
 TOPIC_HOMEPI_PLAYLIST_CONTROL = "homepi/playlists/control"
@@ -122,105 +121,6 @@ def gather_status() -> Dict[str, Any]:
         "cpu_temp": get_cpu_temperature(),
         "hostname": os.uname().nodename,
     }
-
-
-# def handle_control_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
-#
-#     command = payload.get("command")
-#     args = payload.get("args") or {}
-#
-#     if command == "status":
-#         publish(client, TOPIC_STATUS, {**gather_status(), "source": "pi"})
-#         return
-#
-#     if command == "hifi_power":
-#         action = args.get("state")
-#         if action == "on":
-#             hifi_service.turn_on()
-#             publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned on"))
-#             publish_hifi_status(client)
-#         elif action == "off":
-#             hifi_service.turn_off()
-#             publish(client, TOPIC_STATUS, ack_payload(command, True, message="Hi-Fi turned off"))
-#             publish_hifi_status(client)
-#         elif action == "status":
-#             status = hifi_service.check_state()
-#             publish(client, TOPIC_STATUS, ack_payload(command, True, status=status))
-#             publish_hifi_status(client)
-#         else:
-#             publish(client, TOPIC_STATUS, ack_payload(command, False, message="Invalid action for hifi_power command"))
-#         return
-#
-#     publish(
-#         client,
-#         TOPIC_STATUS,
-#         ack_payload(command, False, message="Unknown control command"),
-#     )
-
-
-# def handle_bluetooth_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
-#     command = payload.get("command")
-#     if command != "toggle_bluetooth":
-#         publish(
-#             client,
-#             TOPIC_BT_STATUS,
-#             ack_payload(command, False, message="Unknown Bluetooth command"),
-#         )
-#         return
-#
-#     enable = (payload.get("args") or {}).get("state", "toggle")
-#     enable_str = str(enable).lower()
-#     # Placeholder for Bluetooth control:
-#     # subprocess.run(["/usr/local/bin/bluetooth_toggle.sh", enable_str], check=False)
-#     publish(
-#         client,
-#         TOPIC_BT_STATUS,
-#         ack_payload(command, True, bluetooth_state=enable_str),
-#     )
-
-
-# def handle_mpd_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
-#     command = payload.get("command")
-#
-#     if command == "play":
-#         mpd_service.play()
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="play"))
-#     elif command == "pause":
-#         mpd_service.pause()
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="pause"))
-#     elif command == "stop":
-#         mpd_service.stop()
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="stop"))
-#     elif command == "previous":
-#         mpd_service.previous()
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="previous"))
-#     elif command == "next":
-#         mpd_service.next()
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, state="next"))
-#     elif command == "status":
-#         status = mpd_service.status()
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, status=status))
-#     elif command == "list_playlists":
-#         playlists = mpd_service.list_playlists()
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, playlists=playlists))
-#     elif command == "set_volume":
-#         args = payload.get("args") or {}
-#         volume = args.get("level")
-#         if volume is None or not isinstance(volume, int) or not (0 <= volume <= 100):
-#             publish(client, TOPIC_MPD_STATUS, ack_payload(command, False, message="Invalid volume level"))
-#             return
-#         mpd_service.set_volume(volume)
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, volume=volume))
-#     elif command == "load_playlist":
-#         args = payload.get("args") or {}
-#         playlist_name = args.get("name")
-#         if not playlist_name:
-#             publish(client, TOPIC_MPD_STATUS, ack_payload(command, False, message="Playlist name not provided"))
-#             return
-#         status = mpd_service.load_playlist(playlist_name)
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, True, message=f"Loaded playlist {playlist_name}", status=status))
-#     else:
-#         publish(client, TOPIC_MPD_STATUS, ack_payload(command, False, message="Unknown MPD command"))
 
 
 # def handle_misc_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
@@ -342,35 +242,17 @@ def on_message(client, userdata, msg):
         payload = msg.payload.decode()
         print(f"Received on {msg.topic} (raw): {payload}")
 
-    # if msg.topic == TOPIC_CONTROL:
-    #     handle_control_command(client, payload)
-    # elif msg.topic == TOPIC_MPD_CONTROL:
-    #     handle_mpd_command(client, payload)
-    # elif msg.topic == TOPIC_BT_CONTROL:
-    #     handle_bluetooth_command(client, payload)
-    # elif msg.topic == TOPIC_MISC_CONTROL:
-    #     handle_misc_command(client, payload)
     if msg.topic == TOPIC_HOMEPI_HIFI_CONTROL:
         handle_hifi_mqtt_command(client, payload)
     elif msg.topic == TOPIC_HOMEPI_PLAYLIST_CONTROL:
         handle_playlist_command(client, payload)
     elif msg.topic == TOPIC_HOMEPI_MPD_CONTROL:
         handle_homepi_mpd_command(client, payload)
-    # else:
-    #     publish(
-    #         client,
-    #         TOPIC_STATUS,
-    #         ack_payload(payload.get("command") if isinstance(payload, dict) else None, False, message="Unhandled topic"),
-    #     )
 
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print(f"Connected to MQTT broker at {BROKER}:{PORT}")
-        # client.subscribe(TOPIC_CONTROL)
-        # client.subscribe(TOPIC_MPD_CONTROL)
-        # client.subscribe(TOPIC_BT_CONTROL)
-        # client.subscribe(TOPIC_MISC_CONTROL)
         client.subscribe(TOPIC_HOMEPI_HIFI_CONTROL)
         client.subscribe(TOPIC_HOMEPI_PLAYLIST_CONTROL)
         client.subscribe(TOPIC_HOMEPI_MPD_CONTROL)
