@@ -9,6 +9,10 @@ def get_current_song_artist():
     process = subprocess.run(["mpc", "-f", "%artist%", "current"], capture_output=True, text=True)
     return process.stdout.strip()
 
+def get_current_song_album():
+    process = subprocess.run(["mpc", "-f", "%album%", "current"], capture_output=True, text=True)
+    return process.stdout.strip()
+
 def get_current_song_current_time():
     process = subprocess.run(["mpc", "status", "%currenttime%"], capture_output=True, text=True)
     return process.stdout.strip()
@@ -26,7 +30,6 @@ def load_playlist(playlist_name):
     process = subprocess.run(["mpc", "load", playlist_name], capture_output=True, text=True)
     play()
     return process.stdout.strip()
-
 
 def play():
     subprocess.run(["mpc", "play"])
