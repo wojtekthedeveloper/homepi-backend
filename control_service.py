@@ -62,29 +62,20 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
     # Provide structured status for the new client
     lines = status.splitlines()
     state = "stopped"
-    volume = -1
+    volume = mpd_service.get_volume() or -1
     current_time = mpd_service.get_current_song_current_time() or "0:00"
     total_time =  mpd_service.get_current_song_total_time() or "0:00"
     artist = mpd_service.get_current_song_artist() or "Unknown Artist"
     title = mpd_service.get_current_song_title() or "Unknown Title"
+    repeat = mpd_service.get_repeat_state() == "on"
+    shuffle = mpd_service.get_shuffle_state() == "on"
+    single = mpd_service.get_single_state() == "on"
     
     if len(lines) > 1:
         if "[playing]" in lines[1]:
             state = "playing"
         elif "[paused]" in lines[1]:
             state = "paused"
-            
-    # Parse volume from status string (e.g., "volume: 50%   repeat: off ...")
-    for line in lines:
-        if line.startswith("volume:"):
-            try:
-                # Extract digits from the volume part
-                vol_part = line.split()[1]
-                volume = int("".join(filter(str.isdigit, vol_part)))
-            except (IndexError, ValueError):
-                pass
-            break
-    
     payload = {
         "status": status, 
         "state": state, 
@@ -92,6 +83,9 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
         "total_time": total_time,
         "artist": artist,
         "title": title,
+        "repeat": repeat,
+        "shuffle": shuffle,
+        "single": single,
     }
     if volume != -1:
         payload["volume"] = str(volume)
@@ -320,10 +314,18 @@ def handle_homepi_mpd_command(client: mqtt.Client, payload: Any) -> None:
         state = args.get("state")
         if state in ["on", "off"]:
             mpd_service.repeat(state)
+    elif command == "single":
+        state = args.get("state")
+        if state in ["on", "off"]:
+            mpd_service.single(state)
+    elif command == "seek":
+        state = args.get("seconds")
+        if state is not None:
+            mpd_service.seek(str(state))
     elif command == "set_volume":
         level = args.get("level")
         if level is not None and isinstance(level, int):
-            mpd_service.set_volume(level)
+            mpd_service.volume(level)
     elif command == "status":
         pass
     else:

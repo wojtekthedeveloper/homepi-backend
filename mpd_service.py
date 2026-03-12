@@ -27,8 +27,6 @@ def load_playlist(playlist_name):
     play()
     return process.stdout.strip()
 
-def set_volume(level):
-    subprocess.run(["mpc", "volume", str(level)])
 
 def play():
     subprocess.run(["mpc", "play"])
@@ -51,8 +49,33 @@ def toggle():
 def shuffle(state: str):
     subprocess.run(["mpc", "random", state])
 
+def get_shuffle_state():
+    process = subprocess.run(["mpc", "status", "%random%"], capture_output=True, text=True)
+    return process.stdout.strip()
+
 def repeat(state: str):
     subprocess.run(["mpc", "repeat", state])
+
+def get_repeat_state():
+    process = subprocess.run(["mpc", "status", "%repeat%"], capture_output=True, text=True)
+    return process.stdout.strip()
+
+def single(state: str):
+    subprocess.run(["mpc", "single", state])
+
+def get_single_state():
+    process = subprocess.run(["mpc", "status", "%single%"], capture_output=True, text=True)
+    return process.stdout.strip()
+
+def volume(level):
+    subprocess.run(["mpc", "volume", str(level)])
+
+def get_volume():
+    process = subprocess.run(["mpc", "status", "%volume%"], capture_output=True, text=True)
+    return int(process.stdout.strip().rstrip('%'))
+
+def seek(position: str):
+    subprocess.run(["mpc", "seek", position])
 
 def status():
     process = subprocess.run(["mpc", "status"], capture_output=True, text=True)
