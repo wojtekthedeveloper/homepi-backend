@@ -70,7 +70,7 @@ def publish_mpd_status(client: mqtt.Client) -> None:
     # Provide structured status for the new client
     lines = status.splitlines()
     state = "stopped"
-    volume = 0
+    volume = -1
     
     if len(lines) > 1:
         if "[playing]" in lines[1]:
@@ -89,7 +89,10 @@ def publish_mpd_status(client: mqtt.Client) -> None:
                 pass
             break
     
-    publish(client, TOPIC_HOMEPI_MPD_STATUS, {"status": status, "state": state, "volume": volume})
+    if volume == -1:
+        publish(client, TOPIC_HOMEPI_MPD_STATUS, {"status": status, "state": state})
+    else:
+        publish(client, TOPIC_HOMEPI_MPD_STATUS, {"status": status, "state": state, "volume": volume})
 
 
 def ack_payload(command: Optional[str], success: bool, message: Optional[str] = None, **extra: Any) -> Dict[str, Any]:
