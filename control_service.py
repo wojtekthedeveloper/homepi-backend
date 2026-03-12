@@ -220,8 +220,12 @@ def handle_homepi_mpd_command(client: mqtt.Client, payload: Any) -> None:
             mpd_service.single(state)
     elif command == "seek":
         state = args.get("seconds")
-        if state is not None:
-            mpd_service.seek(str(state))
+        try:
+            seconds = int(state)
+            seek_val = f"+{seconds}" if seconds > 0 else str(seconds)
+            mpd_service.seek(seek_val)
+        except (ValueError, TypeError):
+            pass
     elif command == "set_volume":
         level = args.get("level")
         if level is not None and isinstance(level, int):
