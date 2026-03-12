@@ -5,6 +5,10 @@ def get_current_song_title():
     process = subprocess.run(["mpc", "-f", "%title%", "current"], capture_output=True, text=True)
     return process.stdout.strip()
 
+def get_current_song_filename():
+    process = subprocess.run(["mpc", "-f", "%file%", "current"], capture_output=True, text=True)
+    return process.stdout.strip()
+
 def get_current_song_artist():
     process = subprocess.run(["mpc", "-f", "%artist%", "current"], capture_output=True, text=True)
     return process.stdout.strip()
