@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -30,15 +31,6 @@ PORT = int(os.getenv("MQTT_PORT", "1883"))
 USERNAME = os.getenv("MQTT_USERNAME")
 PASSWORD = os.getenv("MQTT_PASSWORD")
 
-# TOPIC_CONTROL = "pi/control"
-# TOPIC_STATUS = "pi/status"
-# TOPIC_MPD_CONTROL = "pi/mpd/control"
-# TOPIC_MPD_STATUS = "pi/mpd/status"
-# TOPIC_BT_CONTROL = "pi/bluetooth/control"
-# TOPIC_BT_STATUS = "pi/bluetooth/status"
-# TOPIC_MISC_CONTROL = "pi/misc/control"
-# TOPIC_MISC_STATUS = "pi/misc/status"
-
 # New topics for refactored client
 TOPIC_HOMEPI_HIFI_CONTROL = "homepi/hifi/control"
 TOPIC_HOMEPI_HIFI_STATUS = "homepi/hifi/status"
@@ -64,13 +56,17 @@ def publish_playlist_status(client: mqtt.Client) -> None:
     publish(client, TOPIC_HOMEPI_PLAYLIST_STATUS, {"playlists": playlists})
 
 
-def publish_mpd_status(client: mqtt.Client) -> None:
+def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) -> None:
     """Publishes MPD status for the refactored client."""
-    status = mpd_service.status()
+    status = status_str or mpd_service.status()
     # Provide structured status for the new client
     lines = status.splitlines()
     state = "stopped"
     volume = -1
+    current_time = mpd_service.get_current_song_current_time() or "0:00"
+    total_time =  mpd_service.get_current_song_total_time() or "0:00"
+    artist = mpd_service.get_current_song_artist() or "Unknown Artist"
+    title = mpd_service.get_current_song_title() or "Unknown Title"
     
     if len(lines) > 1:
         if "[playing]" in lines[1]:
@@ -89,10 +85,18 @@ def publish_mpd_status(client: mqtt.Client) -> None:
                 pass
             break
     
-    if volume == -1:
-        publish(client, TOPIC_HOMEPI_MPD_STATUS, {"status": status, "state": state})
-    else:
-        publish(client, TOPIC_HOMEPI_MPD_STATUS, {"status": status, "state": state, "volume": volume})
+    payload = {
+        "status": status, 
+        "state": state, 
+        "current_time": current_time,
+        "total_time": total_time,
+        "artist": artist,
+        "title": title,
+    }
+    if volume != -1:
+        payload["volume"] = str(volume)
+        
+    publish(client, TOPIC_HOMEPI_MPD_STATUS, payload)
 
 
 def ack_payload(command: Optional[str], success: bool, message: Optional[str] = None, **extra: Any) -> Dict[str, Any]:
@@ -388,5 +392,16 @@ client.on_message = on_message
 
 client.connect(BROKER, PORT)
 
-print("MQTT control service running...")
-client.loop_forever()
+print("MQTT control service running with heartbeat loop...")
+client.loop_start()
+
+try:
+    while True:
+        status_str = mpd_service.status()
+        # Publish status every second only if playing to reduce traffic
+        if "[playing]" in status_str:
+            publish_mpd_status(client, status_str)
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("Stopping MQTT control service...")
+    client.loop_stop()
