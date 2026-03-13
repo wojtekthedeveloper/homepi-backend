@@ -1,11 +1,13 @@
 import json
 import os
+import shutil
 import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import psutil
 import paho.mqtt.client as mqtt
 
 import hifi_service
@@ -39,6 +41,8 @@ TOPIC_HOMEPI_MPD_CONTROL = "homepi/mpd/control"
 TOPIC_HOMEPI_MPD_STATUS = "homepi/mpd/status"
 TOPIC_HOMEPI_DOWNLOADER_CONTROL = "homepi/downloader/control"
 TOPIC_HOMEPI_DOWNLOADER_STATUS = "homepi/downloader/status"
+TOPIC_HOMEPI_SYSTEM_CONTROL = "homepi/system/control"
+TOPIC_HOMEPI_SYSTEM_STATUS = "homepi/system/status"
 
 
 def publish(client: mqtt.Client, topic: str, payload: Dict[str, Any]) -> None:
@@ -136,7 +140,7 @@ def handle_downloader_command(client: mqtt.Client, payload: Dict[str, Any]) -> N
         name = args.get("name")
         url = args.get("url")
         status = downloader_service.add_playlist(name, url)
-        publish(client, TOPIC_HOMEPI_DOWNLOADER_CONTROL, ack_payload(command, True, status=status))
+        publish(client, TOPIC_HOMEPI_DOWNLOADER_STATUS, ack_payload(command, True, status=status))
     elif command == "append_to_playlist":
         args = payload.get("args") or {}
         name = args.get("name")
@@ -145,6 +149,39 @@ def handle_downloader_command(client: mqtt.Client, payload: Dict[str, Any]) -> N
         publish(client, TOPIC_HOMEPI_DOWNLOADER_STATUS, ack_payload(command, True, status=status))
     else:
         publish(client, TOPIC_HOMEPI_DOWNLOADER_STATUS, ack_payload(command, False, message="Unknown downloader command"))
+
+
+def handle_system_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
+    command = payload.get("command")
+    if command == "get_space_info":
+        target_device = "/dev/sda1"
+        try:
+            partitions = psutil.disk_partitions()
+            mount_point = next((p.mountpoint for p in partitions if p.device == target_device), None)
+
+            if mount_point:
+                usage = psutil.disk_usage(mount_point)
+                publish(client, TOPIC_HOMEPI_SYSTEM_STATUS, ack_payload(command, True, used=usage.used, total=usage.total, free=usage.free, percent=usage.percent))
+            else:
+                publish(client, TOPIC_HOMEPI_SYSTEM_STATUS, ack_payload(command, False, message=f"Device {target_device} not found or not mounted"))
+        except Exception as e:
+            publish(client, TOPIC_HOMEPI_SYSTEM_STATUS, ack_payload(command, False, message=str(e)))
+
+    elif command == "get_resources_info":
+        try:
+            cpu_usage = psutil.cpu_percent(interval=0.1)
+            memory = psutil.virtual_memory()
+            publish(client, TOPIC_HOMEPI_SYSTEM_STATUS, ack_payload(command, True,
+                cpu_usage=cpu_usage,
+                memory_used=memory.used,
+                memory_total=memory.total,
+                memory_percent=memory.percent,
+                memory_available=memory.available
+            ))
+        except Exception as e:
+            publish(client, TOPIC_HOMEPI_SYSTEM_STATUS, ack_payload(command, False, message=str(e)))
+    else:
+        publish(client, TOPIC_HOMEPI_SYSTEM_STATUS, ack_payload(command, False, message="Unknown system command"))
 
 
 def handle_hifi_mqtt_command(client: mqtt.Client, payload: Any) -> None:
@@ -266,6 +303,8 @@ def on_message(client, userdata, msg):
         handle_homepi_mpd_command(client, payload)
     elif msg.topic == TOPIC_HOMEPI_DOWNLOADER_CONTROL:
         handle_downloader_command(client, payload)
+    elif msg.topic == TOPIC_HOMEPI_SYSTEM_CONTROL:
+        handle_system_command(client, payload)
 
 
 def on_connect(client, userdata, flags, rc):
@@ -275,6 +314,7 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe(TOPIC_HOMEPI_PLAYLIST_CONTROL)
         client.subscribe(TOPIC_HOMEPI_MPD_CONTROL)
         client.subscribe(TOPIC_HOMEPI_DOWNLOADER_CONTROL)
+        client.subscribe(TOPIC_HOMEPI_SYSTEM_CONTROL)
         # Initial status updates
         publish_hifi_status(client)
         publish_playlist_status(client)
