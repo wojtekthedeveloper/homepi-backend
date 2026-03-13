@@ -25,6 +25,8 @@ rm -f "$PLAYLIST_FILE"
 $YTDLP_EXE \
   --js-runtimes deno:$DENO_EXE \
   --restrict-filenames \
+  --embed-metadata \
+  --embed-thumbnail \
   --extract-audio --audio-format mp3 \
   -o "$TMP_DIR/%(title)s.%(ext)s" \
   "$URL"
