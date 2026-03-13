@@ -10,7 +10,7 @@ import paho.mqtt.client as mqtt
 
 import hifi_service
 import mpd_service
-import misc_service
+import downloader_service
 
 
 def load_env(path: str = ".env") -> None:
@@ -37,6 +37,8 @@ TOPIC_HOMEPI_PLAYLIST_CONTROL = "homepi/playlists/control"
 TOPIC_HOMEPI_PLAYLIST_STATUS = "homepi/playlists/status"
 TOPIC_HOMEPI_MPD_CONTROL = "homepi/mpd/control"
 TOPIC_HOMEPI_MPD_STATUS = "homepi/mpd/status"
+TOPIC_HOMEPI_DOWNLOADER_CONTROL = "homepi/downloader/control"
+TOPIC_HOMEPI_DOWNLOADER_STATUS = "homepi/downloader/status"
 
 
 def publish(client: mqtt.Client, topic: str, payload: Dict[str, Any]) -> None:
@@ -127,16 +129,16 @@ def gather_status() -> Dict[str, Any]:
     }
 
 
-# def handle_misc_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
-#     command = payload.get("command")
-#     if command == "add_playlist":
-#         args = payload.get("args") or {}
-#         name = args.get("playlist_name")
-#         url = args.get("playlist_url")
-#         status = misc_service.add_playlist(name, url)
-#         publish(client, TOPIC_MISC_STATUS, ack_payload(command, True, status=status))
-#     else:
-#         publish(client, TOPIC_MISC_STATUS, ack_payload(command, False, message="Unknown MISC command"))
+def handle_downloader_command(client: mqtt.Client, payload: Dict[str, Any]) -> None:
+    command = payload.get("command")
+    if command == "add_new_playlist":
+        args = payload.get("args") or {}
+        name = args.get("name")
+        url = args.get("url")
+        status = downloader_service.add_playlist(name, url)
+        publish(client, TOPIC_HOMEPI_DOWNLOADER_CONTROL, ack_payload(command, True, status=status))
+    else:
+        publish(client, TOPIC_HOMEPI_DOWNLOADER_STATUS, ack_payload(command, False, message="Unknown downloader command"))
 
 
 def handle_hifi_mqtt_command(client: mqtt.Client, payload: Any) -> None:
@@ -256,6 +258,8 @@ def on_message(client, userdata, msg):
         handle_playlist_command(client, payload)
     elif msg.topic == TOPIC_HOMEPI_MPD_CONTROL:
         handle_homepi_mpd_command(client, payload)
+    elif msg.topic == TOPIC_HOMEPI_DOWNLOADER_CONTROL:
+        handle_downloader_command(client, payload)
 
 
 def on_connect(client, userdata, flags, rc):
@@ -264,6 +268,7 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe(TOPIC_HOMEPI_HIFI_CONTROL)
         client.subscribe(TOPIC_HOMEPI_PLAYLIST_CONTROL)
         client.subscribe(TOPIC_HOMEPI_MPD_CONTROL)
+        client.subscribe(TOPIC_HOMEPI_DOWNLOADER_CONTROL)
         # Initial status updates
         publish_hifi_status(client)
         publish_playlist_status(client)
