@@ -137,6 +137,12 @@ def handle_downloader_command(client: mqtt.Client, payload: Dict[str, Any]) -> N
         url = args.get("url")
         status = downloader_service.add_playlist(name, url)
         publish(client, TOPIC_HOMEPI_DOWNLOADER_CONTROL, ack_payload(command, True, status=status))
+    elif command == "append_to_playlist":
+        args = payload.get("args") or {}
+        name = args.get("name")
+        url = args.get("url")
+        status = downloader_service.append_playlist(name, url)
+        publish(client, TOPIC_HOMEPI_DOWNLOADER_STATUS, ack_payload(command, True, status=status))
     else:
         publish(client, TOPIC_HOMEPI_DOWNLOADER_STATUS, ack_payload(command, False, message="Unknown downloader command"))
 

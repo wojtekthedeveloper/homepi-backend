@@ -8,3 +8,6 @@ def script_path(script_name):
 
 def add_playlist(name, url):
     subprocess.run([script_path('add_playlist.sh'), name, url])
+
+def append_playlist(name, url):
+    subprocess.run([script_path('append_to_playlist.sh'), name, url])
