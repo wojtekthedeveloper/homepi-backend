@@ -100,7 +100,7 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
     if album is not None:
         payload["album"] = album
     if filepath is not None:
-        payload["filepath"] = album
+        payload["filepath"] = filepath
         
     publish(client, TOPIC_HOMEPI_MPD_STATUS, payload)
 
