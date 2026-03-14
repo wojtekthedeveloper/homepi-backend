@@ -73,6 +73,7 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
     artist = mpd_service.get_current_song_artist() or None
     album = mpd_service.get_current_song_album() or None
     title = mpd_service.get_current_song_title() or mpd_service.get_current_song_filename() or "Unknown"
+    filepath = mpd_service.get_current_song_filepath() or None
     repeat = mpd_service.get_repeat_state() == "on"
     shuffle = mpd_service.get_shuffle_state() == "on"
     single = mpd_service.get_single_state() == "on"
@@ -98,6 +99,8 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
         payload["artist"] = artist
     if album is not None:
         payload["album"] = album
+    if filepath is not None:
+        payload["filepath"] = album
         
     publish(client, TOPIC_HOMEPI_MPD_STATUS, payload)
 
