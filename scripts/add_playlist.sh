@@ -13,12 +13,17 @@ if [ -z "$NAME" ] || [ -z "$URL" ]; then
   exit 1
 fi
 
+if [ -z "$THUMBNAILS_DIR_PATH" ]; then
+  echo "Error: THUMBNAILS_DIR_PATH is not set in .env or environment."
+  exit 1
+fi
+
 TMP_DIR="/tmp/$NAME"
 MUSIC_DIR="$MPD_DATA_PATH/music/$NAME"
 PLAYLIST_FILE="$MPD_DATA_PATH/playlists/$NAME.m3u"
 
 
-mkdir -p "$TMP_DIR" "$MUSIC_DIR"
+mkdir -p "$TMP_DIR" "$MUSIC_DIR" "$THUMBNAILS_DIR_PATH"
 rm -f "$PLAYLIST_FILE"
 
 # Download playlist as mp3 into temp dir
@@ -35,6 +40,13 @@ if ! compgen -G "$TMP_DIR/*.mp3" > /dev/null; then
     echo "no mp3 found in $TMP_DIR"
     rmdir "$TMP_DIR" 2>/dev/null || true
     exit 1
+fi
+
+# Extract thumbnail from first mp3
+FIRST_MP3=$(ls "$TMP_DIR"/*.mp3 | head -n 1)
+if [ -n "$FIRST_MP3" ]; then
+    echo "Extracting thumbnail from $FIRST_MP3"
+    ffmpeg -y -i "$FIRST_MP3" -an -c:v copy "$THUMBNAILS_DIR_PATH/$NAME.jpg"
 fi
 
 # Normalize filenames to simple ASCII and move to music dir
