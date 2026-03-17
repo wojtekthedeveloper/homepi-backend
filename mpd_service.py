@@ -35,6 +35,11 @@ def load_playlist(playlist_name):
     play()
     return process.stdout.strip()
 
+def play_url(url):
+    subprocess.run(["mpc", "clear"])
+    subprocess.run(["mpc", "add", url])
+    play()
+
 def play():
     subprocess.run(["mpc", "play"])
 

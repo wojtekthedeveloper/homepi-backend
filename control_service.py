@@ -43,6 +43,8 @@ TOPIC_HOMEPI_DOWNLOADER_CONTROL = "homepi/downloader/control"
 TOPIC_HOMEPI_DOWNLOADER_STATUS = "homepi/downloader/status"
 TOPIC_HOMEPI_SYSTEM_CONTROL = "homepi/system/control"
 TOPIC_HOMEPI_SYSTEM_STATUS = "homepi/system/status"
+TOPIC_HOMEPI_RADIO_CONTROL = "homepi/radio/control"
+TOPIC_HOMEPI_RADIO_STATUS = "homepi/radio/status"
 
 
 def publish(client: mqtt.Client, topic: str, payload: Dict[str, Any]) -> None:
@@ -231,7 +233,6 @@ def handle_playlist_command(client: mqtt.Client, payload: Any) -> None:
         if name:
             mpd_service.load_playlist(name)
             publish(client, TOPIC_HOMEPI_PLAYLIST_STATUS, ack_payload(command, True, message="playlist loaded"))
-            # publish_playlist_status(client)
     else:
         return
 
@@ -290,6 +291,25 @@ def handle_homepi_mpd_command(client: mqtt.Client, payload: Any) -> None:
     publish_mpd_status(client)
 
 
+def handle_radio_command(client: mqtt.Client, payload: Any) -> None:
+    """Handles commands for the new homepi/radio control topic."""
+    if not isinstance(payload, dict):
+        return
+
+    command = payload.get("command")
+    args = payload.get("args") or {}
+
+    if command == "playRadio":
+        url = args.get("url")
+        name = args.get("name")
+        if url:
+            mpd_service.play_url(url)
+            publish(client, TOPIC_HOMEPI_RADIO_STATUS, ack_payload(command, True, message=f"Playing radio: {name or url}"))
+            publish_mpd_status(client)
+    else:
+        return
+
+
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
@@ -308,6 +328,8 @@ def on_message(client, userdata, msg):
         handle_downloader_command(client, payload)
     elif msg.topic == TOPIC_HOMEPI_SYSTEM_CONTROL:
         handle_system_command(client, payload)
+    elif msg.topic == TOPIC_HOMEPI_RADIO_CONTROL:
+        handle_radio_command(client, payload)
 
 
 def on_connect(client, userdata, flags, rc):
@@ -318,6 +340,7 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe(TOPIC_HOMEPI_MPD_CONTROL)
         client.subscribe(TOPIC_HOMEPI_DOWNLOADER_CONTROL)
         client.subscribe(TOPIC_HOMEPI_SYSTEM_CONTROL)
+        client.subscribe(TOPIC_HOMEPI_RADIO_CONTROL)
         # Initial status updates
         publish_hifi_status(client)
         publish_playlist_status(client)
@@ -326,28 +349,29 @@ def on_connect(client, userdata, flags, rc):
         print(f"Failed to connect, return code {rc}")
 
 
-client = mqtt.Client()
-if USERNAME and PASSWORD:
-    client.username_pw_set(USERNAME, PASSWORD)
-else:
-    print("Warning: No MQTT credentials set.")
-    raise SystemExit(1)
+if __name__ == "__main__":
+    client = mqtt.Client()
+    if USERNAME and PASSWORD:
+        client.username_pw_set(USERNAME, PASSWORD)
+    else:
+        print("Warning: No MQTT credentials set.")
+        raise SystemExit(1)
 
-client.on_connect = on_connect
-client.on_message = on_message
+    client.on_connect = on_connect
+    client.on_message = on_message
 
-client.connect(BROKER, PORT)
+    client.connect(BROKER, PORT)
 
-print("MQTT control service running with heartbeat loop...")
-client.loop_start()
+    print("MQTT control service running with heartbeat loop...")
+    client.loop_start()
 
-try:
-    while True:
-        status_str = mpd_service.status()
-        # Publish status every second only if playing to reduce traffic
-        if "[playing]" in status_str:
-            publish_mpd_status(client, status_str)
-        time.sleep(1)
-except KeyboardInterrupt:
-    print("Stopping MQTT control service...")
-    client.loop_stop()
+    try:
+        while True:
+            status_str = mpd_service.status()
+            # Publish status every second only if playing to reduce traffic
+            if "[playing]" in status_str:
+                publish_mpd_status(client, status_str)
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Stopping MQTT control service...")
+        client.loop_stop()
