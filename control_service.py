@@ -79,6 +79,7 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
     repeat = mpd_service.get_repeat_state() == "on"
     shuffle = mpd_service.get_shuffle_state() == "on"
     single = mpd_service.get_single_state() == "on"
+    current_playlist = mpd_service.get_current_playlist()
     
     if len(lines) > 1:
         if "[playing]" in lines[1]:
@@ -94,6 +95,7 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
         "shuffle": shuffle,
         "single": single,
         "title": title,
+        "current_playlist": current_playlist,
     }
     if volume != -1:
         payload["volume"] = str(volume)

@@ -92,3 +92,23 @@ def seek(position: str):
 def status():
     process = subprocess.run(["mpc", "status"], capture_output=True, text=True)
     return process.stdout.strip()
+
+def get_current_playlist():
+    # Format: id|position|title|artist|album|duration
+    # Using %position% for 1-based index, %id% for MPD song ID
+    fmt = "%id%;;;;;%position%;;;;;%time%;;;;;%title%;;;;;%artist%;;;;;%album%"
+    process = subprocess.run(["mpc", "-f", fmt, "playlist"], capture_output=True, text=True)
+    
+    playlist = []
+    for line in process.stdout.strip().splitlines():
+        parts = line.split(";;;;;")
+        if len(parts) == 6:
+            playlist.append({
+                "id": parts[0],
+                "pos": parts[1],
+                "duration": parts[2],
+                "title": parts[3] or "Unknown Title",
+                "artist": parts[4] or "Unknown Artist",
+                "album": parts[5] or None,
+            })
+    return playlist
