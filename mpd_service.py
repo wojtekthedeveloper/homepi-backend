@@ -25,6 +25,10 @@ def get_current_song_total_time():
     process = subprocess.run(["mpc", "status", "%totaltime%"], capture_output=True, text=True)
     return process.stdout.strip()
 
+def get_current_song_position():
+    process = subprocess.run(["mpc", "-f", "%position%", "current"], capture_output=True, text=True)
+    return process.stdout.strip()
+
 def list_playlists():
     process = subprocess.run(["mpc", "lsplaylists"], capture_output=True, text=True)
     return process.stdout.strip().splitlines()

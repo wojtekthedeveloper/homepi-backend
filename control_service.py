@@ -63,6 +63,12 @@ def publish_playlist_status(client: mqtt.Client) -> None:
     publish(client, TOPIC_HOMEPI_PLAYLIST_STATUS, {"playlists": playlists})
 
 
+def publish_current_playlist(client: mqtt.Client) -> None:
+    """Publishes the current playlist for the refactored client."""
+    current_playlist = mpd_service.get_current_playlist()
+    publish(client, TOPIC_HOMEPI_PLAYLIST_STATUS, {"current_playlist": current_playlist})
+
+
 def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) -> None:
     """Publishes MPD status for the refactored client."""
     status = status_str or mpd_service.status()
@@ -79,7 +85,7 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
     repeat = mpd_service.get_repeat_state() == "on"
     shuffle = mpd_service.get_shuffle_state() == "on"
     single = mpd_service.get_single_state() == "on"
-    current_playlist = mpd_service.get_current_playlist()
+    position = mpd_service.get_current_song_position() or None
     
     if len(lines) > 1:
         if "[playing]" in lines[1]:
@@ -95,7 +101,6 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
         "shuffle": shuffle,
         "single": single,
         "title": title,
-        "current_playlist": current_playlist,
     }
     if volume != -1:
         payload["volume"] = str(volume)
@@ -105,6 +110,8 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
         payload["album"] = album
     if filepath is not None:
         payload["filepath"] = filepath
+    if position is not None:
+        payload["position"] = position
         
     publish(client, TOPIC_HOMEPI_MPD_STATUS, payload)
 
@@ -223,6 +230,7 @@ def handle_playlist_command(client: mqtt.Client, payload: Any) -> None:
     if not isinstance(payload, dict):
         if str(payload).lower() == "status":
             publish_playlist_status(client)
+            publish_current_playlist(client)
         return
 
     command = payload.get("command")
@@ -230,11 +238,14 @@ def handle_playlist_command(client: mqtt.Client, payload: Any) -> None:
 
     if command == "get_playlists":
         publish_playlist_status(client)
+    elif command == "get_current_playlist":
+        publish_current_playlist(client)
     elif command == "play_playlist":
         name = args.get("name")
         if name:
             mpd_service.load_playlist(name)
             publish(client, TOPIC_HOMEPI_PLAYLIST_STATUS, ack_payload(command, True, message="playlist loaded"))
+            publish_current_playlist(client)
     else:
         return
 
@@ -346,6 +357,7 @@ def on_connect(client, userdata, flags, rc):
         # Initial status updates
         publish_hifi_status(client)
         publish_playlist_status(client)
+        publish_current_playlist(client)
         publish_mpd_status(client)
     else:
         print(f"Failed to connect, return code {rc}")
