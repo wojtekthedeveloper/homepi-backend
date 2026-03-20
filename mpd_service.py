@@ -47,6 +47,9 @@ def play_url(url):
 def play():
     subprocess.run(["mpc", "play"])
 
+def play_position(position):
+    subprocess.run(["mpc", "play", str(position)])
+
 def pause():
     subprocess.run(["mpc", "pause"])
 

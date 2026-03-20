@@ -240,6 +240,12 @@ def handle_playlist_command(client: mqtt.Client, payload: Any) -> None:
         publish_playlist_status(client)
     elif command == "get_current_playlist":
         publish_current_playlist(client)
+    elif command == "play_position":
+        pos = args.get("position")
+        if pos is not None:
+            mpd_service.play_position(pos)
+            publish(client, TOPIC_HOMEPI_PLAYLIST_STATUS, ack_payload(command, True, message=f"playing position {pos}"))
+
     elif command == "play_playlist":
         name = args.get("name")
         if name:
@@ -312,7 +318,7 @@ def handle_radio_command(client: mqtt.Client, payload: Any) -> None:
     command = payload.get("command")
     args = payload.get("args") or {}
 
-    if command == "playRadio":
+    if command == "play_radio":
         url = args.get("url")
         name = args.get("name")
         if url:
