@@ -39,6 +39,7 @@ TOPIC_HOMEPI_PLAYLIST_CONTROL = "homepi/playlists/control"
 TOPIC_HOMEPI_PLAYLIST_STATUS = "homepi/playlists/status"
 TOPIC_HOMEPI_MPD_CONTROL = "homepi/mpd/control"
 TOPIC_HOMEPI_MPD_STATUS = "homepi/mpd/status"
+TOPIC_HOMEPI_MPD_PROGRESS = "homepi/mpd/progress"
 TOPIC_HOMEPI_DOWNLOADER_CONTROL = "homepi/downloader/control"
 TOPIC_HOMEPI_DOWNLOADER_STATUS = "homepi/downloader/status"
 TOPIC_HOMEPI_SYSTEM_CONTROL = "homepi/system/control"
@@ -69,7 +70,7 @@ def publish_current_playlist(client: mqtt.Client) -> None:
     publish(client, TOPIC_HOMEPI_PLAYLIST_STATUS, {"current_playlist": current_playlist})
 
 
-def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) -> None:
+def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None, topic: str = TOPIC_HOMEPI_MPD_STATUS) -> None:
     """Publishes MPD status for the refactored client."""
     status = status_str or mpd_service.status()
     # Provide structured status for the new client
@@ -113,7 +114,7 @@ def publish_mpd_status(client: mqtt.Client, status_str: Optional[str] = None) ->
     if position is not None:
         payload["position"] = position
         
-    publish(client, TOPIC_HOMEPI_MPD_STATUS, payload)
+    publish(client, topic, payload)
 
 
 def ack_payload(command: Optional[str], success: bool, message: Optional[str] = None, **extra: Any) -> Dict[str, Any]:
@@ -390,7 +391,7 @@ if __name__ == "__main__":
             status_str = mpd_service.status()
             # Publish status every second only if playing to reduce traffic
             if "[playing]" in status_str:
-                publish_mpd_status(client, status_str)
+                publish_mpd_status(client, status_str, topic=TOPIC_HOMEPI_MPD_PROGRESS)
             time.sleep(1)
     except KeyboardInterrupt:
         print("Stopping MQTT control service...")
