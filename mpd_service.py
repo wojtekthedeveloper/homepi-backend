@@ -91,7 +91,10 @@ def volume(level):
 
 def get_volume():
     process = subprocess.run(["mpc", "status", "%volume%"], capture_output=True, text=True)
-    return int(process.stdout.strip().rstrip('%'))
+    try:
+        return int(process.stdout.strip().rstrip('%'))
+    except ValueError:
+        return None
 
 def seek(position: str):
     subprocess.run(["mpc", "seek", position])
